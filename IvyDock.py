@@ -23,10 +23,14 @@ TOOLS_FILE    = "tools_data.json"
 USAGE_LOG     = "usage_log.json"
 
 DEFAULT_SETTINGS = {
-    "theme":"System","font_size":10,
-    "window_width":1800,"window_height":1200,
-    "language":"中文"
+    "theme":"System",
+    "font_size":10,
+    "window_width":1800,
+    "window_height":1200,
+    "language":"中文",
+    "python_path":"python"      # 新增：默认解释器命令
 }
+
 
 I18N = {
     "中文":{
@@ -43,9 +47,12 @@ I18N = {
         "confirm_delete":"确认删除","launch_error":"启动失败",
         "restart_prompt":"设置已保存，需要重启后生效，立即重启？",
         "recent_usage":"近期工具使用情况",
+        "opt_py_cli": "命令行Python工具",
+        "opt_py_exec": "可执行Python工具",
         "today_top5":"今日使用 Top5","trend7":"7天趋势","trend30":"30天趋势",
         "opt_website":"网站","opt_cli":"命令行工具","opt_exec":"可执行程序",
         "cli_title":"命令行工具运行","cli_args":"参数","cli_run":"运行","cli_output":"输出"
+
     },
     "English":{
         "app_title":"Tool Manager","search":"Search tools...",
@@ -61,6 +68,8 @@ I18N = {
         "confirm_delete":"Confirm Delete","launch_error":"Launch Error",
         "restart_prompt":"Settings saved. Restart now to apply?",
         "recent_usage":"Recent Usage","today_top5":"Today Top5",
+        "opt_py_cli": "Python CLI Tool",
+        "opt_py_exec": "Python Executable",
         "trend7":"7‑day Trend","trend30":"30‑day Trend",
         "opt_website":"Website","opt_cli":"CLI","opt_exec":"Executable",
         "cli_title":"Run CLI Tool","cli_args":"Args","cli_run":"Run","cli_output":"Output"
@@ -168,7 +177,7 @@ class Dashboard(QWidget):
 class SettingsDialog(QDialog):
     def __init__(self, settings, L):
         super().__init__(); self.settings = settings; self.L = L
-        self.setWindowTitle(L["settings"]); self.resize(400,250)
+        self.setWindowTitle(L["settings"]); self.resize(400,280)
         layout = QFormLayout(self)
         # 主题
         self.theme_cb = QComboBox(); self.theme_cb.addItems([L["light"],L["dark"],L["system"]])
@@ -189,6 +198,9 @@ class SettingsDialog(QDialog):
         # 语言
         self.lang_cb = QComboBox(); self.lang_cb.addItems(list(I18N.keys()))
         self.lang_cb.setCurrentText(settings.get("language","中文")); layout.addRow(L["language"], self.lang_cb)
+        # ← 新增：Python 解释器路径
+        self.python_path_edit = QLineEdit(settings.get("python_path", "python"))
+        layout.addRow("Python 解释器路径", self.python_path_edit)
         # 按钮
         bb = QDialogButtonBox(QDialogButtonBox.Ok|QDialogButtonBox.Cancel)
         bb.button(QDialogButtonBox.Ok).setText(L["ok"]); bb.button(QDialogButtonBox.Cancel).setText(L["cancel"])
@@ -201,13 +213,15 @@ class SettingsDialog(QDialog):
             "font_size": self.font_spin.value(),
             "window_width": self.w_spin.value(),
             "window_height": self.h_spin.value(),
-            "language": self.lang_cb.currentText()
+            "language": self.lang_cb.currentText(),
+            "python_path": self.python_path_edit.text().strip()   # 新增
         }
 
 # 命令行工具对话框，实时输出
 class CommandLineDialog(QDialog):
-    def __init__(self, exe, default_args, L):
+    def __init__(self, exe, script, default_args, L):
         super().__init__(); self.L=L
+        self.script = script        # ← 新增：保存脚本路径
         self.setWindowTitle(L["cli_title"]); self.resize(600,400)
         layout = QVBoxLayout(self)
         # 参数
@@ -234,7 +248,9 @@ class CommandLineDialog(QDialog):
             self.process.waitForFinished()
             self.out_view.appendPlainText("\n--- 进程被中断 ---\n")
         self.out_view.clear()
-        args = self.arg_edit.text().split()
+        parts = self.arg_edit.text().split()
+        # 真正的启动参数：先插入 script，再加上用户输入的 parts
+        args = ([self.script] if self.script else []) + parts
         self.process.start(self.exe, args)
 
     def on_ready_read(self):
@@ -258,7 +274,13 @@ class AddToolDialog(QDialog):
 
         # 1) 类型下拉
         self.type_cb = QComboBox()
-        self.type_cb.addItems([L["opt_website"], L["opt_cli"], L["opt_exec"]])
+        self.type_cb.addItems([
+            L["opt_website"],
+            L["opt_cli"],
+            L["opt_exec"],
+            L["opt_py_cli"],  # 新增
+            L["opt_py_exec"],  # 新增
+        ])
         fmt.addRow(L["type"], self.type_cb)
 
         # 2) 名称、URL、分类、路径、参数、文档、说明  —— 先创建好所有控件
@@ -308,14 +330,21 @@ class AddToolDialog(QDialog):
         self.update_fields(self.type_cb.currentText())
 
     def update_fields(self, t):
-        is_ws  = (t == self.L["opt_website"])
+        is_ws = (t == self.L["opt_website"])
         is_cli = (t == self.L["opt_cli"])
-        # URL 仅网站启用
+        is_exec = (t == self.L["opt_exec"])
+        is_py_cli = (t == self.L["opt_py_cli"])  # 新增：命令行 Python 工具
+        is_py_exec = (t == self.L["opt_py_exec"])  # 新增：可执行 Python 工具
+
+        # URL 仅网站时启用
         self.url.setEnabled(is_ws)
-        # 路径在 CLI 或 EXE 时启用
-        self.path.setEnabled(is_cli or t == self.L["opt_exec"])
-        # 参数仅 CLI 时启用
-        self.args.setEnabled(is_cli)
+
+        # 路径在 CLI、EXE、命令行Python、可执行Python 时启用
+        self.path.setEnabled(is_cli or is_exec or is_py_cli or is_py_exec)
+
+        # 参数仅在 CLI 或 命令行Python 时启用
+        self.args.setEnabled(is_cli or is_py_cli)
+
         # 文档与说明始终启用
         self.doc.setEnabled(True)
         self.desc.setEnabled(True)
@@ -435,9 +464,10 @@ class ToolManager(QWidget):
                 os.startfile(doc)
             return
 
-        # 2. 命令行工具
+        # 2. 普通命令行工具
         if typ == self.L["opt_cli"] and exe and os.path.isfile(exe):
-            self.cli_dialog = CommandLineDialog(exe, default_args, self.L)
+            # exe 就是可执行路径，script 设为 None
+            self.cli_dialog = CommandLineDialog(exe, None, default_args, self.L)
             self.cli_dialog.show()
             if doc and os.path.isfile(doc):
                 os.startfile(doc)
@@ -447,6 +477,28 @@ class ToolManager(QWidget):
         if typ == self.L["opt_exec"] and exe and os.path.isfile(exe):
             try:
                 os.startfile(exe)
+            except Exception as e:
+                QMessageBox.warning(self, self.L["launch_error"], str(e))
+            if doc and os.path.isfile(doc):
+                os.startfile(doc)
+            return
+
+        # 命令行 Python 工具
+        if typ == self.L["opt_py_cli"] and exe and os.path.isfile(exe):
+            python = self.settings.get("python_path", "python")
+            # exe 是 .py 脚本路径，传给 script
+            self.cli_dialog = CommandLineDialog(python, exe, default_args, self.L)
+            self.cli_dialog.show()
+            if doc and os.path.isfile(doc):
+                os.startfile(doc)
+            return
+
+        # 可执行 Python 工具（GUI 脚本或打包后的 .exe）
+        if typ == self.L["opt_py_exec"] and exe and os.path.isfile(exe):
+            python = self.settings.get("python_path", "python")
+            try:
+                # script 放在参数列表里同理，也可以直接双击 .exe
+                QProcess.startDetached(python, [exe] + default_args)
             except Exception as e:
                 QMessageBox.warning(self, self.L["launch_error"], str(e))
             if doc and os.path.isfile(doc):
