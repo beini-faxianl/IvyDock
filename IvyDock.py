@@ -393,6 +393,13 @@ class ToolManager(QWidget):
             self.setWindowIcon(QIcon(icon_path))
         self.settings = load_json(SETTINGS_FILE, DEFAULT_SETTINGS)
         apply_theme(QApplication.instance() or QApplication(sys.argv), self.settings)
+        # ✅ 插入以下初始化代码
+        if not os.path.exists(TOOLS_FILE):
+            save_json(TOOLS_FILE, [])
+        if not os.path.exists(SETTINGS_FILE):
+            save_json(SETTINGS_FILE, DEFAULT_SETTINGS)
+        if not os.path.exists(USAGE_LOG):
+            save_json(USAGE_LOG, [])
         self.L = I18N[self.settings["language"]]
         self.setWindowTitle(self.L["app_title"])
         self.resize(self.settings["window_width"], self.settings["window_height"])
