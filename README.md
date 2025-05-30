@@ -27,20 +27,19 @@
 
 - ✅ **工具统一管理**
    支持添加/编辑/删除工具，支持五种类型：
-
   - 网站（Website）
   - 命令行工具（CLI Tool）
   - 可执行程序（Executable）
   - 命令行Python工具（Python CLI Tool）
   - 可执行Python工具（Python Executable）
-
+  - 命令行Java工具（Java CLI Tool）
+  - 可执行Java程序（Python Executable）
+  
 - ✅ **分类与搜索**
    支持自定义工具分类，快速搜索工具名称或分类关键词
 
 - ✅ **说明文档支持**
    每个工具可绑定 Markdown/Text/PDF 格式的说明文档，支持自动打开阅读
-
-  
 
 - ✅ **个性化配置**
    提供界面设置选项，包括：
@@ -98,11 +97,13 @@
 
 - **工具类型**（必须选择）：
 
-  - 🌐 网站：如 FOFA、ZoomEye、SRC 等网页入口
-  - ⚙️ 命令行工具：如 nmap、sqlmap、ffuf 等可在终端运行的工具
-  - 🖥 可执行程序：如 BurpSuite.exe、Wireshark.exe 等 GUI 工具
-  - 🐍 命令行 Python 工具：如 `recon.py` 等 Python 脚本型工具（终端交互）
-  - 🐍 可执行 Python 工具：如用 Tkinter、PyQt 编写的 GUI 工具
+  - 🌐 **网站**：如 FOFA、ZoomEye、SRC 等网页入口
+  - ⚙️ **命令行工具**：如 nmap、sqlmap、ffuf 等可在终端运行的工具
+  - 🖥 **可执行程序**：如 BurpSuite.exe、Wireshark.exe 等 GUI 工具
+  - 🐍 **命令行 Python 工具**：如 `recon.py` 等 Python 脚本型工具（终端交互）
+  - 🐍 **可执行 Python 工具**：如基于 Tkinter、PyQt 开发的桌面工具或打包为 `.exe` 的脚本
+  - ☕ **命令行 Java 工具**：如 `java -jar tool.jar` 或 `java ToolClass` 启动的终端型工具
+  - ☕ **可执行 Java 工具**：如基于 Swing/JavaFX 的 GUI 工具，或 install4j 等打包的 `.exe` 启动器（如 ZAP）
 
 - **字段填写说明**：
 
@@ -125,10 +126,11 @@
 #### 3、使用工具
 
 - 在工具列表中，**双击任意工具**即可启动：
-  - 网站：自动在默认浏览器中打开网址
-  - CLI工具：打开内置命令行窗口，自动执行并显示输出
-  - 可执行程序：自动在系统中运行工具（等同于双击）
-  - Python工具：根据类型使用用户指定的解释器运行 `.py` 脚本
+  - 🌐 **网站**：自动在默认浏览器中打开网址
+  - ⚙️ **命令行工具**：打开内置命令行窗口，自动执行并显示输出
+  - 🖥 **可执行程序**：自动在系统中运行工具（等同于资源管理器双击）
+  - 🐍 **Python 工具**：根据类型使用用户设置的解释器运行 `.py` 脚本或打包的 `.exe`
+  - ☕ **Java 工具**：根据类型使用设置的 `java` 执行器运行 `.jar` 或 `.class` 文件，支持交互与 GUI 启动
 - **如配置了说明文档，会在启动工具时自动打开阅读文档。**
 
 ------

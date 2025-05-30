@@ -28,7 +28,9 @@ DEFAULT_SETTINGS = {
     "window_width":1800,
     "window_height":1200,
     "language":"中文",
-    "python_path":"python"      # 新增：默认解释器命令
+    "python_path":"python",      # 新增：默认解释器命令
+    "java_path": "java"         # 新增：Java解释器路径
+
 }
 
 
@@ -51,7 +53,9 @@ I18N = {
         "opt_py_exec": "可执行Python工具",
         "today_top5":"今日使用 Top5","trend7":"7天趋势","trend30":"30天趋势",
         "opt_website":"网站","opt_cli":"命令行工具","opt_exec":"可执行程序",
-        "cli_title":"命令行工具运行","cli_args":"参数","cli_run":"运行","cli_output":"输出"
+        "cli_title":"命令行工具运行","cli_args":"参数","cli_run":"运行","cli_output":"输出",
+        "opt_java_cli": "命令行Java工具",
+        "opt_java_exec": "可执行Java程序",
 
     },
     "English":{
@@ -72,7 +76,9 @@ I18N = {
         "opt_py_exec": "Python Executable",
         "trend7":"7‑day Trend","trend30":"30‑day Trend",
         "opt_website":"Website","opt_cli":"CLI","opt_exec":"Executable",
-        "cli_title":"Run CLI Tool","cli_args":"Args","cli_run":"Run","cli_output":"Output"
+        "cli_title":"Run CLI Tool","cli_args":"Args","cli_run":"Run","cli_output":"Output",
+        "opt_java_cli": "Java CLI Tool",
+        "opt_java_exec": "Java Executable",
     }
 }
 
@@ -201,6 +207,9 @@ class SettingsDialog(QDialog):
         # ← 新增：Python 解释器路径
         self.python_path_edit = QLineEdit(settings.get("python_path", "python"))
         layout.addRow("Python 解释器路径", self.python_path_edit)
+        #在这里插入Java 解释器路径
+        self.java_path_edit = QLineEdit(settings.get("java_path", "java"))
+        layout.addRow("Java 执行器路径", self.java_path_edit)
         # 按钮
         bb = QDialogButtonBox(QDialogButtonBox.Ok|QDialogButtonBox.Cancel)
         bb.button(QDialogButtonBox.Ok).setText(L["ok"]); bb.button(QDialogButtonBox.Cancel).setText(L["cancel"])
@@ -214,7 +223,8 @@ class SettingsDialog(QDialog):
             "window_width": self.w_spin.value(),
             "window_height": self.h_spin.value(),
             "language": self.lang_cb.currentText(),
-            "python_path": self.python_path_edit.text().strip()   # 新增
+            "python_path": self.python_path_edit.text().strip(),   # 新增
+            "java_path": self.java_path_edit.text().strip(),  # 新增
         }
 
 # 命令行工具对话框，实时输出
@@ -250,7 +260,7 @@ class CommandLineDialog(QDialog):
         self.out_view.clear()
         parts = self.arg_edit.text().split()
         # 真正的启动参数：先插入 script，再加上用户输入的 parts
-        args = ([self.script] if self.script else []) + parts
+        args = (self.script.split() if self.script else []) + parts
         self.process.start(self.exe, args)
 
     def on_ready_read(self):
@@ -275,11 +285,10 @@ class AddToolDialog(QDialog):
         # 1) 类型下拉
         self.type_cb = QComboBox()
         self.type_cb.addItems([
-            L["opt_website"],
-            L["opt_cli"],
-            L["opt_exec"],
-            L["opt_py_cli"],  # 新增
-            L["opt_py_exec"],  # 新增
+            L["opt_website"], L["opt_cli"], L["opt_exec"],
+            L["opt_py_cli"], L["opt_py_exec"],
+            L["opt_java_cli"],  # 新增
+            L["opt_java_exec"]  # 新增
         ])
         fmt.addRow(L["type"], self.type_cb)
 
@@ -335,15 +344,17 @@ class AddToolDialog(QDialog):
         is_exec = (t == self.L["opt_exec"])
         is_py_cli = (t == self.L["opt_py_cli"])  # 新增：命令行 Python 工具
         is_py_exec = (t == self.L["opt_py_exec"])  # 新增：可执行 Python 工具
+        is_java_cli = (t == self.L["opt_java_cli"])  # 新增
+        is_java_exec = (t == self.L["opt_java_exec"])  # 新增
 
         # URL 仅网站时启用
         self.url.setEnabled(is_ws)
 
         # 路径在 CLI、EXE、命令行Python、可执行Python 时启用
-        self.path.setEnabled(is_cli or is_exec or is_py_cli or is_py_exec)
+        self.path.setEnabled(is_cli or is_exec or is_py_cli or is_py_exec or is_java_cli or is_java_exec)
 
         # 参数仅在 CLI 或 命令行Python 时启用
-        self.args.setEnabled(is_cli or is_py_cli)
+        self.args.setEnabled(is_cli or is_py_cli or is_java_cli)
 
         # 文档与说明始终启用
         self.doc.setEnabled(True)
@@ -474,9 +485,15 @@ class ToolManager(QWidget):
             return
 
         # 3. 可执行程序
+        import subprocess
         if typ == self.L["opt_exec"] and exe and os.path.isfile(exe):
             try:
-                os.startfile(exe)
+                # 设置启动目录为工具所在路径
+                cwd = os.path.dirname(exe)
+                subprocess.Popen(exe, cwd=cwd)
+            except Exception as e:
+                QMessageBox.warning(self, self.L["launch_error"], str(e))
+
             except Exception as e:
                 QMessageBox.warning(self, self.L["launch_error"], str(e))
             if doc and os.path.isfile(doc):
@@ -499,6 +516,32 @@ class ToolManager(QWidget):
             try:
                 # script 放在参数列表里同理，也可以直接双击 .exe
                 QProcess.startDetached(python, [exe] + default_args)
+            except Exception as e:
+                QMessageBox.warning(self, self.L["launch_error"], str(e))
+            if doc and os.path.isfile(doc):
+                os.startfile(doc)
+            return
+        # Java 命令行工具
+        if typ == self.L["opt_java_cli"] and exe and os.path.isfile(exe):
+            java_cmd = self.settings.get("java_path", "java")
+            if exe.endswith(".jar"):
+                self.cli_dialog = CommandLineDialog(java_cmd, None, default_args, self.L)
+                self.cli_dialog.script = "-jar " + exe  # ✅ 作为前缀注入，不污染用户参数栏
+            else:
+                classname = os.path.splitext(os.path.basename(exe))[0]
+                self.cli_dialog = CommandLineDialog(java_cmd, None, default_args, self.L)
+                self.cli_dialog.script = classname
+            self.cli_dialog.show()
+            if doc and os.path.isfile(doc):
+                os.startfile(doc)
+            return
+
+        # Java 可执行程序
+        if typ == self.L["opt_java_exec"] and exe and os.path.isfile(exe):
+            java_cmd = self.settings.get("java_path", "java")
+            try:
+                args = ["-jar", exe] if exe.endswith(".jar") else [exe]
+                QProcess.startDetached(java_cmd, args + default_args)
             except Exception as e:
                 QMessageBox.warning(self, self.L["launch_error"], str(e))
             if doc and os.path.isfile(doc):
